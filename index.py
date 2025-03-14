@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
 
+# Function to initialize the database
 def init_db():
     conn = sqlite3.connect("vehicles.db")
     cursor = conn.cursor()
@@ -32,6 +33,26 @@ def init_db():
     conn.commit()
     conn.close()
 
+# Function to add vehicle
+def add_vehicle():
+    name = entry_name.get()
+    v_type = entry_type.get()
+    fuel_type = entry_fuel_type.get()
+    fuel_consumption = entry_fuel_consumption.get()
+    
+    if not name or not fuel_consumption:
+        messagebox.showerror("Error", "Vehicle Name and Fuel Consumption are required")
+        return
+    
+    conn = sqlite3.connect("vehicles.db")
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO vehicles (name, type, fuel_type, fuel_consumption) VALUES (?, ?, ?, ?)", 
+                   (name, v_type, fuel_type, float(fuel_consumption)))
+    conn.commit()
+    conn.close()
+    messagebox.showinfo("Success", "Vehicle added successfully")
+
+# Function to add service record
 def add_service():
     vehicle_id = entry_service_vehicle_id.get()
     service_type = entry_service_type.get()
@@ -49,32 +70,62 @@ def add_service():
     conn.commit()
     conn.close()
     messagebox.showinfo("Success", "Service record added successfully")
-
-def view_service_history():
-    vehicle_id = entry_service_history_vehicle_id.get()
     
-    if not vehicle_id:
-        messagebox.showerror("Error", "Vehicle ID is required")
+# Function to calculate possible distance based on fuel added
+def calculate_distance():
+    vehicle_id = entry_vehicle_id.get()
+    fuel_added = entry_fuel_added.get()
+    
+    if not vehicle_id or not fuel_added:
+        messagebox.showerror("Error", "Vehicle ID and Fuel Added are required")
         return
     
     conn = sqlite3.connect("vehicles.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT service_type, service_date, cost FROM service_records WHERE vehicle_id = ?", (vehicle_id,))
-    services = cursor.fetchall()
+    cursor.execute("SELECT fuel_consumption FROM vehicles WHERE id = ?", (vehicle_id,))
+    result = cursor.fetchone()
     
-    if services:
-        service_history_text.delete(1.0, tk.END)
-        for service in services:
-            service_history_text.insert(tk.END, f"Service Type: {service[0]}\nDate: {service[1]}\nCost: {service[2]:.2f}\n\n")
+    if result:
+        fuel_consumption = result[0]
+        km_possible = float(fuel_added) / fuel_consumption
+        cursor.execute("INSERT INTO fuel_records (vehicle_id, fuel_added, km_possible) VALUES (?, ?, ?)",
+                       (vehicle_id, float(fuel_added), km_possible))
+        conn.commit()
+        messagebox.showinfo("Result", f"The vehicle can travel approximately {km_possible:.2f} Km.")
     else:
-        messagebox.showerror("Error", "No service records found for this vehicle")
+        messagebox.showerror("Error", "Vehicle not found")
     
     conn.close()
 
-# Initialize database
+
+# Function to view service history for a specific vehicle
+def view_service_history():
+    vehicle_id = entry_service_history_vehicle_id.get()
+    
+    if not vehicle_id:
+        messagebox.showerror("Error", "Please provide a Vehicle ID")
+        return
+    
+    conn = sqlite3.connect("vehicles.db")
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT service_type, service_date, cost FROM service_records WHERE vehicle_id = ?", (vehicle_id,))
+    results = cursor.fetchall()
+    
+    if results:
+        service_history_text.delete(1.0, tk.END)  # Clear previous results
+        for record in results:
+            service_history_text.insert(tk.END, f"Service Type: {record[0]}\nService Date: {record[1]}\nCost: {record[2]}\n\n")
+    else:
+        messagebox.showinfo("No Record", "No service history found for this vehicle.")
+    
+    conn.close()
+
+
+# Initialize the database
 init_db()
 
-# Create GUI
+# Create the GUI
 root = tk.Tk()
 root.title("Vehicle Management System")
 root.geometry("500x600")
